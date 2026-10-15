@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>自动关联积分</title>
+  <%= csrf_meta_tags %>
+  <style>
+    :root {
+      color-scheme: light;
+      --background: #F5F5F5;
+      --foreground: #000000;
+      --card: #FFFFFF;
+      --muted-foreground: #595959;
+      --border: #D9D9D9;
+      --primary: #B2E40D;
+      --primary-foreground: #000000;
+      --accent: #EDFFDC;
+      --accent-foreground: #245600;
+      --ring: #4EA100;
+      --error: #B42318;
+      --error-background: #FFF4F2;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --background: #000000;
+        --foreground: #E5E5E5;
+        --card: #1E1E20;
+        --muted-foreground: #ABABAE;
+        --border: #363636;
+        --primary: #9FEF00;
+        --accent: #202F02;
+        --accent-foreground: #9FEF00;
+        --ring: #9FEF00;
+        --error: #FFB4AB;
+        --error-background: #35201E;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .binding-header {
+      height: 60px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+    .binding-header-inner {
+      width: 100%;
+      max-width: 1320px;
+      height: 100%;
+      margin: 0 auto;
+      padding: 0 48px;
+      display: flex;
+      align-items: center;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .binding-main { max-width: 672px; margin: 48px auto; padding: 0 16px; }
+    .binding-card {
+      padding: 32px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    .binding-card h1 { margin: 0 0 12px; font-size: 24px; font-weight: 600; line-height: 1.35; }
+    .binding-description { margin: 0; color: var(--muted-foreground); }
+    .binding-status {
+      margin: 24px 0 0;
+      padding: 16px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: var(--accent-foreground);
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+    .binding-status[data-state="pending"] { display: flex; align-items: center; gap: 12px; }
+    .binding-status[data-state="pending"]::before {
+      content: "";
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      border: 2px solid var(--border);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: binding-spin 1s linear infinite;
+    }
+    .binding-status[data-state="error"] { background: var(--error-background); color: var(--error); }
+    .binding-hint { margin: 12px 0 0; color: var(--muted-foreground); font-size: 14px; }
+    .binding-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    .binding-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      color: var(--foreground);
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+    }
+    .binding-button:hover { background: var(--background); }
+    .binding-button-primary { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+    .binding-button-primary:hover { background: var(--primary); filter: brightness(0.96); }
+    .binding-button:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+    @keyframes binding-spin { to { transform: rotate(360deg); } }
+    @media (max-width: 640px) {
+      .binding-header-inner { padding: 0 16px; }
+      .binding-main { margin: 24px auto; }
+      .binding-card { padding: 24px 20px; }
+      .binding-card h1 { font-size: 22px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .binding-status[data-state="pending"]::before { animation: none; }
+    }
+  </style>
+</head>
+<body>
+<header class="binding-header">
+  <div class="binding-header-inner">积分账户</div>
+</header>
+<main class="binding-main">
+  <section class="binding-card" aria-labelledby="binding-title">
+    <h1 id="binding-title">自动关联积分账户</h1>
+    <p class="binding-description">核对两端通行证身份后自动关联。不按邮箱或本地用户 ID 合并，不转移积分。</p>
+    <% unless @binding_signed_in %>
+      <p class="binding-status" role="alert">请先登录论坛，并使用与积分系统相同的通行证账号。未激活或待审批的账号须先完成论坛原生流程。</p>
+      <p class="binding-hint">登录完成后返回积分页面，重新发起自动关联。</p>
+    <% else %>
+      <p class="binding-status" id="binding-result" data-state="pending" role="status" aria-live="polite" aria-busy="true">正在自动关联…</p>
+    <% end %>
+    <div class="binding-actions">
+      <% unless @binding_signed_in %>
+        <a class="binding-button binding-button-primary" href="/login">登录论坛</a>
+      <% end %>
+      <a class="binding-button" href="<%= SpacemitForumIdentity.config.fetch(:audience) %>/settings/forum-binding">返回积分设置</a>
+    </div>
+  </section>
+</main>
+<script nonce="<%= csp_nonce_placeholder %>">
+(async () => {
+  const handle = location.hash.slice(1);
+  history.replaceState(null, '', location.pathname);
+  const result = document.getElementById('binding-result');
+  if (!result) return;
+  if (!/^[A-Za-z0-9_-]{43}$/.test(handle)) {
+    result.textContent = '关联申请已失效，请返回积分设置重新发起。';
+    result.dataset.state = 'error';
+    result.setAttribute('aria-busy', 'false');
+    return;
+  }
+  try {
+    const response = await fetch('/credis-forum-identity/bind', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
+      body: JSON.stringify({ handle }),
+    });
+    if (!response.ok) throw new Error('unavailable');
+    const body = await response.json();
+    const target = new URL(body.url);
+    if (target.origin !== <%= SpacemitForumIdentity.config.fetch(:audience).to_json.html_safe %> || target.pathname !== '/settings/forum-binding' || target.hash !== '#' + handle) throw new Error('invalid');
+    location.assign(target.href);
+  } catch {
+    result.textContent = '自动关联未完成。请确认两端使用同一通行证账号，论坛账号已激活且获准访问，并在两端重新登录后重试。';
+    result.dataset.state = 'error';
+    result.setAttribute('aria-busy', 'false');
+  }
+})();
+</script>
+</body>
+</html>
